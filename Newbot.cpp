@@ -17,6 +17,9 @@
 #include "json/forwards.h"
 #include "json/json.h"
 
+#include <windows.h>
+#include <Shlwapi.h> // For PathRemoveFileSpecA
+
 static std::string Login(std::string username, std::string password);
 
 static void LoginOnClientOpen(std::string username, std::string password) {
@@ -105,6 +108,8 @@ static std::string Login(std::string username, std::string password) {
     return result;
 }
 
+std::string g_loginFilePath;
+
 #define MY_BUFSIZE 1024  // Buffer size for console window titles.
 std::vector<std::pair<std::string, std::string>> get_login_list() {
     HWND hwndFound;  // This is what is returned to the caller.
@@ -152,23 +157,28 @@ std::vector<std::pair<std::string, std::string>> get_login_list() {
     ofn.lpstrInitialDir = NULL;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
     if (GetOpenFileName(&ofn) == TRUE) {
-        char c_szText[260];
-        wcstombs(c_szText, szFile, wcslen(szFile) + 1);
+        // Convert the TCHAR (wide character) file path to a narrow string
+        char filePathAnsi[MY_BUFSIZE];
+        wcstombs(filePathAnsi, szFile, wcslen(szFile) + 1);
+        g_loginFilePath = filePathAnsi; // Save the file path in the global variable
+
         std::ifstream file(szFile);
-        std::vector<std::pair<std::string, std::string>> result = {};
-        for (std::string line; std::getline(file, line);) {
-            auto seperator = line.find(":");
-            if (seperator == std::string::npos) {
-                throw "error in login file";
+        std::vector<std::pair<std::string, std::string>> result;
+        for (std::string line; std::getline(file, line); ) {
+            auto separator = line.find(':');
+            if (separator == std::string::npos) {
+                throw std::runtime_error("Error in login file format.");
             }
-            std::string username = line.substr(0, seperator);
-            std::cout << username << std::endl;
-            std::string password = line.substr(seperator + 1, line.length());
-            //std::cout << password << std::endl;
-            result.push_back(std::make_pair(username, password));
+            std::string username = line.substr(0, separator);
+            std::string password = line.substr(separator + 1);
+            result.emplace_back(username, password);
         }
+        file.close();
         return result;
     }
+    throw std::runtime_error("File selection was cancelled or an error occurred.");
+
+
     return {};
 }
 bool get_friend_list(std::vector<std::string>& players) {
@@ -360,6 +370,90 @@ void save_successful_login(const std::pair<std::string, std::string>& account) {
     }
 }
 
+void remove_account_and_save(const std::pair<std::string, std::string>& account) {
+    // Load all accounts from the original file
+    std::ifstream inFile(g_loginFilePath);
+    std::vector<std::pair<std::string, std::string>> accounts;
+    std::string line;
+    while (std::getline(inFile, line)) {
+        auto separator = line.find(':');
+        if (separator != std::string::npos) {
+            std::string username = line.substr(0, separator);
+            std::string password = line.substr(separator + 1);
+            if (username != account.first) { // If it's not the account we want to remove
+                accounts.emplace_back(username, password);
+            }
+        }
+    }
+    inFile.close();
+
+    // Write the updated list back to the file
+    std::ofstream outFile(g_loginFilePath, std::ios::trunc);
+    for (const auto& acc : accounts) {
+        outFile << acc.first << ":" << acc.second << "\n";
+    }
+    outFile.close();
+
+    // Append the successfully logged-in account to the 'successful_logins.txt' file in the program directory
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    PathRemoveFileSpecA(exePath); // Remove the executable name, leaving the directory path
+    //GetCurrentDirectoryA(MAX_PATH, programDir); // Get the current directory where the program is running
+
+    std::string successFilePath = std::string(exePath) + "\\successful_logins.txt";
+
+    std::ofstream successFile(successFilePath, std::ios::app);
+    if (successFile.is_open()) {
+        successFile << account.first << ":" << account.second << "\n"; // Write the account data
+        successFile.close(); // Close the file
+    }
+    else {
+        std::cerr << "Unable to open file for writing successful logins." << std::endl;
+    }
+}
+
+void remove_account_and_save_invalid(const std::pair<std::string, std::string>& account) {
+    // Load all accounts from the original file
+    std::ifstream inFile(g_loginFilePath);
+    std::vector<std::pair<std::string, std::string>> accounts;
+    std::string line;
+    while (std::getline(inFile, line)) {
+        auto separator = line.find(':');
+        if (separator != std::string::npos) {
+            std::string username = line.substr(0, separator);
+            std::string password = line.substr(separator + 1);
+            if (username != account.first) { // If it's not the account we want to remove
+                accounts.emplace_back(username, password);
+            }
+        }
+    }
+    inFile.close();
+
+    // Write the updated list back to the file
+    std::ofstream outFile(g_loginFilePath, std::ios::trunc);
+    for (const auto& acc : accounts) {
+        outFile << acc.first << ":" << acc.second << "\n";
+    }
+    outFile.close();
+
+    // Append the successfully logged-in account to the 'successful_logins.txt' file in the program directory
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    PathRemoveFileSpecA(exePath); // Remove the executable name, leaving the directory path
+    //GetCurrentDirectoryA(MAX_PATH, programDir); // Get the current directory where the program is running
+
+    std::string invalidFilePath = std::string(exePath) + "\\invalid_logins.txt";
+
+    std::ofstream invalidFile(invalidFilePath, std::ios::app);
+    if (invalidFile.is_open()) {
+        invalidFile << account.first << ":" << account.second << "\n"; // Write the account data
+        invalidFile.close(); // Close the file
+    }
+    else {
+        std::cerr << "Unable to open file for writing invalid logins." << std::endl;
+    }
+}
+
 
 int main() {
     LPWSTR* szArgList;
@@ -476,6 +570,10 @@ int main() {
             std::cout << "Debug: League Path set to '" << LCU::leaguePath << "'\n";
 
 
+            //std::vector<std::pair<std::string, std::string>> list1 = get_login_list();
+            std::vector<std::pair<std::string, std::string>> remaining_logins;
+
+            std::string loginFilePath = g_loginFilePath;
 
 
             for (auto& i : list) {
@@ -497,6 +595,9 @@ int main() {
 
                 if (login_result == "authenticated") {
                     std::cout << "Login successful. Checking client readiness..." << std::endl;
+
+                    //save_successful_login(i);
+                    std::cout << "Login successful for account: " << i.first << std::endl;
 
                     int retries = 0;
                     const int maxRetries = 30;
@@ -522,6 +623,9 @@ int main() {
                     std::cout << "Client is ready. Waiting a bit before doing any actions..." << std::endl;
                     std::this_thread::sleep_for(std::chrono::seconds(15));
 
+                    remove_account_and_save(i);
+
+
                     if (should_message_all) {
                         std::cout << "Messaging all friends..." << std::endl;
                         run_mass_message(message);
@@ -541,6 +645,10 @@ int main() {
                     }
 
 
+                }
+                else if (login_result == "needs_credentials" || "needs_multifactor_verification")
+                {
+                    remove_account_and_save_invalid(i);
                 }
 
             }
