@@ -637,13 +637,14 @@ int main() {
                             std::string invite = R"({"name":")" + friendName + R"("})";
                             std::string response = LCU::Request("POST", "https://127.0.0.1/lol-chat/v1/friend-requests", invite);
                             std::cout << friendName << std::endl;
-                            std::cout << response << std::endl;
+                            std::cout << "Response: " << response << std::endl;
 
                             Json::CharReaderBuilder builder;
                             JSONCPP_STRING errs;
                             Json::Value jsonResponse;
                             std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-                            if (reader->parse(response.c_str(), response.c_str() + response.length(), &jsonResponse, &errs)) {
+                            if (reader->parse(response.c_str(), response.c_str() + response.size(), &jsonResponse, &errs)) {
+                                // The parsing was successful, now check for the error condition
                                 if (jsonResponse.isMember("errorCode") && jsonResponse["errorCode"].asString() == "RPC_ERROR" &&
                                     jsonResponse.isMember("httpStatus") && jsonResponse["httpStatus"].asInt() == 500) {
                                     std::cerr << "Error response for POST /chat/v4/friendrequests: " << jsonResponse["message"].asString() << std::endl;
@@ -654,6 +655,7 @@ int main() {
                             }
                             else {
                                 std::cerr << "Failed to parse JSON response: " << errs << std::endl;
+                                // Handle non-JSON response or JSON parsing error here
                             }
                         }
                     }
