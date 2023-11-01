@@ -633,14 +633,28 @@ int main() {
 
                     if (!friend_targets.empty()) {
                         std::cout << "Adding friends..." << std::endl;
-                        for (auto& i : friend_targets) {
-                            std::cout << i << std::endl;
-                            std::string invite = R"({"name":")" + i + R"("})";
-                            std::cout << LCU::Request(
-                                "POST",
-                                "https://127.0.0.1/lol-chat/v1/friend-requests",
-                                invite)
-                                << std::endl;
+                        for (auto& friendName : friend_targets) {
+                            std::string invite = R"({"name":")" + friendName + R"("})";
+                            std::string response = LCU::Request("POST", "https://127.0.0.1/lol-chat/v1/friend-requests", invite);
+                            std::cout << friendName << std::endl;
+                            std::cout << response << std::endl;
+
+                            Json::CharReaderBuilder builder;
+                            JSONCPP_STRING errs;
+                            Json::Value jsonResponse;
+                            std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+                            if (reader->parse(response.c_str(), response.c_str() + response.length(), &jsonResponse, &errs)) {
+                                if (jsonResponse.isMember("errorCode") && jsonResponse["errorCode"].asString() == "RPC_ERROR" &&
+                                    jsonResponse.isMember("httpStatus") && jsonResponse["httpStatus"].asInt() == 500) {
+                                    std::cerr << "Error response for POST /chat/v4/friendrequests: " << jsonResponse["message"].asString() << std::endl;
+                                    // Log out and break out of the friend_targets loop to proceed to the next account
+                                    logout();
+                                    break;
+                                }
+                            }
+                            else {
+                                std::cerr << "Failed to parse JSON response: " << errs << std::endl;
+                            }
                         }
                     }
 
