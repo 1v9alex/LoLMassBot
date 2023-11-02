@@ -662,9 +662,8 @@ int main() {
 
                     if (!friend_targets.empty()) {
                         std::cout << "Adding friends..." << std::endl;
-                        std::vector<std::string> friendsToRemove;
-
-                        for (auto& friendName : friend_targets) {
+                        for (auto it = friend_targets.begin(); it != friend_targets.end(); ) {
+                            const std::string& friendName = *it;
                             std::string invite = R"({"name":")" + friendName + R"("})";
                             std::string response = LCU::Request("POST", "https://127.0.0.1/lol-chat/v1/friend-requests", invite);
                             std::cout << friendName << std::endl;
@@ -688,14 +687,14 @@ int main() {
                                     processedFriends.insert(friendName);
                                 }
                             }
-                            else {
-                               // std::cerr << "Failed to parse JSON response: " << errs << std::endl;
-                                // Handle non-JSON response or JSON parsing error here
+                            it = friend_targets.erase(it); // This removes the current friend and advances the iterator
+
+                            // Now write the updated friend_targets list back to the file
+                            std::ofstream outFile(g_friendListFilePath, std::ios::trunc);
+                            for (const std::string& remainingFriend : friend_targets) {
+                                outFile << remainingFriend << "\n";
                             }
-                            friendsToRemove.push_back(friendName);
-                        }
-                        for (const auto& friendName : friendsToRemove) {
-                            remove_friend_and_update_list(friendName, g_friendListFilePath);
+                            outFile.close();
                         }
                     }
                 }
