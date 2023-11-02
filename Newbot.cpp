@@ -181,6 +181,9 @@ std::vector<std::pair<std::string, std::string>> get_login_list() {
 
     return {};
 }
+
+std::string g_friendListFilePath;
+
 bool get_friend_list(std::vector<std::string>& players) {
     HWND hwndFound;  // This is what is returned to the caller.
     char pszNewWindowTitle[MY_BUFSIZE];  // Contains fabricated
@@ -227,6 +230,9 @@ bool get_friend_list(std::vector<std::string>& players) {
     ofn.lpstrInitialDir = NULL;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
     if (GetOpenFileName(&ofn) == TRUE) {
+        char filePathAnsi[MAX_PATH];
+        wcstombs(filePathAnsi, szFile, wcslen(szFile) + 1);
+        g_friendListFilePath = filePathAnsi; // Set the global variable
         char c_szText[260];
         wcstombs(c_szText, szFile, wcslen(szFile) + 1);
         std::ifstream file(szFile);
@@ -454,6 +460,26 @@ void remove_account_and_save_invalid(const std::pair<std::string, std::string>& 
     }
 }
 
+void remove_friend_and_update_list(const std::string& friendName, const std::string& filePath) {
+    // Open the existing file to read the friend list
+    std::ifstream inFile(filePath);
+    std::vector<std::string> friends;
+    std::string line;
+    while (std::getline(inFile, line)) {
+        if (line != friendName) { // If it's not the friend we want to remove
+            friends.push_back(line);
+        }
+    }
+    inFile.close();
+
+    // Write the updated list back to the file
+    std::ofstream outFile(filePath, std::ios::trunc);
+    for (const auto& name : friends) {
+        outFile << name << "\n";
+    }
+    outFile.close();
+}
+
 
 int main() {
     LPWSTR* szArgList;
@@ -631,8 +657,13 @@ int main() {
                         run_mass_message(message);
                     }
 
+                    std::set<std::string> processedFriends;
+
+
                     if (!friend_targets.empty()) {
                         std::cout << "Adding friends..." << std::endl;
+                        std::vector<std::string> friendsToRemove;
+
                         for (auto& friendName : friend_targets) {
                             std::string invite = R"({"name":")" + friendName + R"("})";
                             std::string response = LCU::Request("POST", "https://127.0.0.1/lol-chat/v1/friend-requests", invite);
@@ -652,15 +683,21 @@ int main() {
                                     logout();
                                     break;
                                 }
+                                else
+                                {
+                                    processedFriends.insert(friendName);
+                                }
                             }
                             else {
-                                std::cerr << "Failed to parse JSON response: " << errs << std::endl;
+                               // std::cerr << "Failed to parse JSON response: " << errs << std::endl;
                                 // Handle non-JSON response or JSON parsing error here
                             }
+                            friendsToRemove.push_back(friendName);
+                        }
+                        for (const auto& friendName : friendsToRemove) {
+                            remove_friend_and_update_list(friendName, g_friendListFilePath);
                         }
                     }
-
-
                 }
                 else if (login_result == "needs_credentials" || "needs_multifactor_verification")
                 {
