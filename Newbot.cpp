@@ -10,6 +10,9 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <limits>
+#include <iostream>
+
 
 #include "LCU.h"
 #include "Misc.h"
@@ -591,7 +594,7 @@ int main() {
                 std::getline(std::cin, message);
             }
             std::cout << "League Path\n";
-            std::cin.ignore();
+          //  std::cin.ignore();
             getline(std::cin, LCU::leaguePath);
             std::cout << "Debug: League Path set to '" << LCU::leaguePath << "'\n";
 
@@ -649,13 +652,15 @@ int main() {
                     std::cout << "Client is ready. Waiting a bit before doing any actions..." << std::endl;
                     std::this_thread::sleep_for(std::chrono::seconds(15));
 
-                    remove_account_and_save(i);
-
-
                     if (should_message_all) {
                         std::cout << "Messaging all friends..." << std::endl;
                         run_mass_message(message);
                     }
+
+
+                   remove_account_and_save(i);
+
+
 
                     std::set<std::string> processedFriends;
 
