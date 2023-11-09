@@ -593,6 +593,8 @@ int main() {
                 std::cin.ignore();
                 std::getline(std::cin, message);
             }
+
+
             std::cout << "League Path\n";
           //  std::cin.ignore();
             getline(std::cin, LCU::leaguePath);
@@ -649,7 +651,7 @@ int main() {
                     }
 
 
-                    std::cout << "Client is ready. Waiting a bit before doing any actions..." << std::endl;
+                    std::cout << "Client ias ready. Waiting a bit before doing any actions..." << std::endl;
                     std::this_thread::sleep_for(std::chrono::seconds(15));
 
                     if (should_message_all) {
@@ -658,7 +660,7 @@ int main() {
                     }
 
 
-                   remove_account_and_save(i);
+                //   remove_account_and_save(i);
 
 
 
@@ -703,7 +705,7 @@ int main() {
                         }
                     }
                 }
-                else if (login_result == "needs_credentials" || "needs_multifactor_verification")
+                else if (login_result == "needs_credentials" || login_result == "needs_multifactor_verification")
                 {
                     remove_account_and_save_invalid(i);
                 }
