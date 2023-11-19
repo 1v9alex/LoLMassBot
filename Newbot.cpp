@@ -10,8 +10,10 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
-#include <limits>
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <limits>
 
 
 #include "LCU.h"
@@ -484,6 +486,39 @@ void remove_friend_and_update_list(const std::string& friendName, const std::str
 }
 
 
+std::string GetConfigValue(const std::string& key) {
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    PathRemoveFileSpecA(buffer); // Remove the executable name, leaving the directory path
+    std::string configFilePath = std::string(buffer) + "\\config.txt";
+
+    std::string value;
+    std::ifstream configFile(configFilePath);
+    if (configFile.is_open()) {
+        std::string line;
+        while (getline(configFile, line)) {
+            size_t separator = line.find('=');
+            if (separator != std::string::npos) {
+                std::string currentKey = line.substr(0, separator);
+                if (currentKey == key) {
+                    value = line.substr(separator + 1);
+                    break;
+                }
+            }
+        }
+        configFile.close();
+    }
+    else {
+        std::cerr << "Unable to open config file at: " << configFilePath << std::endl;
+        std::cin.clear();
+        std::cin.ignore(INT_MAX, '\n');
+        std::cerr << "Please enter the full path for " << key << ": ";
+        std::getline(std::cin, value);
+        std::cerr << "You entered: " << value << std::endl;
+    }
+    return value;
+}
+
 int main() {
     LPWSTR* szArgList;
     int argCount;
@@ -590,16 +625,61 @@ int main() {
 
             if (should_message_all) {
                 std::cout << "Message:\n";
-                std::cin.ignore();
+                std::cin.ignore(INT_MAX, '\n');
                 std::getline(std::cin, message);
             }
 
 
-            std::cout << "League Path\n";
+           /* std::cout << "League Path\n";
           //  std::cin.ignore();
             getline(std::cin, LCU::leaguePath);
-            std::cout << "Debug: League Path set to '" << LCU::leaguePath << "'\n";
+            std::cout << "Debug: League Path set to '" << LCU::leaguePath << "'\n";*/
 
+
+            // Get the path of the current executable
+            /*char buffer[MAX_PATH];
+            GetModuleFileName(NULL, buffer, MAX_PATH);
+            std::string exePath = std::string(buffer).substr(0, std::string(buffer).find_last_of("\\/"));
+
+            // Construct the path to the config.txt file
+            std::string configFilePath = exePath + "\\config.txt";
+
+            std::string leaguePath;
+            std::ifstream configFile(configFilePath);
+            if (configFile.is_open()) {
+                std::string line;
+                while (getline(configFile, line)) {
+                    // Assuming the format is 'key=value'
+                    size_t separator = line.find('=');
+                    if (separator != std::string::npos) {
+                        std::string key = line.substr(0, separator);
+                        std::string value = line.substr(separator + 1);
+                        if (key == "league_path") {
+                            leaguePath = value;
+                            break;
+                        }
+                    }
+                }
+                configFile.close();
+            }
+            else {
+                std::cerr << "Unable to open config file." << std::endl;
+                // Handle the error, possibly by asking the user to input the path
+            }
+
+            LCU::leaguePath = leaguePath;
+            std::cout << "Debug: League Path set to '" << LCU::leaguePath << "'\n";*/
+
+
+            std::string leaguePath = GetConfigValue("league_path");
+            if (!leaguePath.empty()) {
+                LCU::leaguePath = leaguePath;
+                std::cout << "Debug: League Path set to '" << LCU::leaguePath << "'\n";
+            }
+            else {
+                // Handle the error if the league path is not found
+                std::cerr << "League path could not be determined." << std::endl;
+            }
 
             //std::vector<std::pair<std::string, std::string>> list1 = get_login_list();
             std::vector<std::pair<std::string, std::string>> remaining_logins;
@@ -660,7 +740,7 @@ int main() {
                     }
 
 
-                //   remove_account_and_save(i);
+                   remove_account_and_save(i);
 
 
 
